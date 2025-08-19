@@ -1,33 +1,66 @@
 import axios from "axios";
 
-// Function to fetch user data from GitHub API
+// Create axios instance
+const api = axios.create({
+    baseURL: "https://api.github.com",
+    headers: {
+        Accept: "application/vnd.github.v3+json",
+        // Authorization: `token ${import.meta.env.VITE_APP_GITHUB_API_KEY}`, // if you have a token
+    },
+});
+
+// Basic user fetch by username
 export const fetchUserData = async (username) => {
-    if (!username) throw new Error("Username is required");
+    if (!username) return null;
 
-    const response = await axios.get(`https://api.github.com/users/${username}`);
-    return response.data; // return user data to component
+    try {
+        const response = await api.get(`/users/${username}`);
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching user:", error);
+        return null;
+    }
 };
 
-import axios from "axios";
-
-// Function for advanced search
+// Advanced search with filters: username, location, minRepos
 export const fetchAdvancedUsers = async ({ username, location, minRepos }) => {
-    let query = "";
+    try {
+        let query = username ? `${username} in:login` : "";
+        if (location) query += ` location:${location}`;
+        if (minRepos) query += ` repos:>=${minRepos}`;
 
-    if (username) query += `${username} in:login `;
-    if (location) query += `location:${location} `;
-    if (minRepos) query += `repos:>=${minRepos} `;
+        if (!query) return [];
 
-    const response = await axios.get(`https://api.github.com/search/users?q=${encodeURIComponent(query)}&per_page=10`);
-    const users = response.data.items;
+        const response = await api.get("/search/users", { params: { q: query } });
+        const users = response.data.items || [];
 
-    // Fetch additional details for each user (optional)
-    const detailedUsers = await Promise.all(
-        users.map(async (user) => {
-            const res = await axios.get(`https://api.github.com/users/${user.login}`);
-            return res.data;
-        })
-    );
+        // Fetch full details for each user
+        const detailedUsers = await Promise.all(
+            users.map(async (user) => {
+                try {
+                    const res = await api.get(user.url);
+                    return res.data;
+                } catch {
+                    return user; // fallback if detail fetch fails
+                }
+            })
+        );
 
-    return detailedUsers;
+        return detailedUsers;
+    } catch (error) {
+        console.error("Error fetching advanced users:", error);
+        return [];
+    }
 };
+
+import { fetchUserData, fetchAdvancedUsers } from "./githubService";
+
+test("fetchUserData returns user data for a valid username", async () => {
+    const data = await fetchUserData("octocat");
+    expect(data).toHaveProperty("login", "octocat");
+});
+
+test("fetchAdvancedUsers returns an array of users", async () => {
+    const data = await fetchAdvancedUsers({ username: "octocat" });
+    expect(Array.isArray(data)).toBe(true);
+});
