@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { fetchAdvancedUsers } from "../services/githubService";
 
@@ -17,13 +16,19 @@ function Search() {
         setUsers([]);
 
         try {
-            const data = await fetchAdvancedUsers({ username, location, minRepos });
-            if (data.length === 0) {
+            const data = await fetchAdvancedUsers({
+                username: username.trim(),
+                location: location.trim(),
+                minRepos: minRepos ? parseInt(minRepos, 10) : 0,
+            });
+
+            if (!data || data.length === 0) {
                 setError("Looks like we can't find the user");
             } else {
                 setUsers(data);
             }
-        } catch {
+        } catch (err) {
+            console.error(err);
             setError("Looks like we can't find the user");
         } finally {
             setLoading(false);
@@ -53,6 +58,7 @@ function Search() {
                     value={minRepos}
                     onChange={(e) => setMinRepos(e.target.value)}
                     className="border p-2 rounded"
+                    min="0"
                 />
                 <button type="submit" className="bg-blue-600 text-white p-2 rounded">
                     Search
